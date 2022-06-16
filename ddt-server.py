@@ -20,6 +20,9 @@ from dnslib import RR, RCODE, QTYPE
 # Solution:
 # pip3 install dnslib
 
+__version__ = '2.2'
+
+
 from dnslib.server import DNSServer,DNSHandler,BaseResolver,DNSLogger
 
 last_request_timestamp = None
@@ -44,8 +47,12 @@ class FixedResolver(BaseResolver):
 		qname = request.q.qname
 		
 		lookup_request = b".".join(request.q.qname.label)
+		#logging.debug("lookup_request=" + lookup_request.decode('utf-8'))
+
 		base_domain = lookup_request.endswith(str.encode(args.domain))
-		
+		#logging.debug("base_domain=" + base_domain.decode('utf-8'))
+
+		# TODO support subdomains... <dict>.a.evil.lan breaks the logic for now
 		if base_domain:
 			
 			if self.last_domain is None: self.last_domain = lookup_request	# First request fix
@@ -89,7 +96,8 @@ class FixedResolver(BaseResolver):
 					# Use to avoid retransmission false positives
 					last_request_timestamp = time.time()
 				else:
-					logging.warning("Received a possible duplicate request because of too fast query: {timing} {dns}; Last domain is {ld}".format(timing=current_timestamp - last_request_timestamp, dns=".".join(request.q.qname.label), ld=self.last_domain))
+					#logging.warning("Received a possible duplicate request because of too fast query: {timing} {dns}; Last domain is {ld}".format(timing=current_timestamp - last_request_timestamp, dns=".".join(request.q.qname.label), ld=self.last_domain))
+					logging.warning("Received a possible duplicate request because of too fast query")
 
 			else:
 				logging.debug("Received something other than A or AAAA lookup: {}".format(qt))
@@ -327,7 +335,7 @@ if __name__ == '__main__':
   ___  ___ _____ 
  |   \|   \_   _|
  | |) | |) || |  
- |___/|___/ |_|  server v2.0 (by th3r3g3nt)
+ |___/|___/ |_|  server v""" + __version__ + """ (by th3r3g3nt)
  Dictionary-based Data Transfer (via DNS)
  Data exfil for Red Teams
  
@@ -335,8 +343,8 @@ if __name__ == '__main__':
 	
 	""")
 
+	logging.info("Listening for DNS requests for " + args.domain)
 
-	
 	# The reply engine
 	resolver = FixedResolver(args.response)
 	

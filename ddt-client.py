@@ -14,13 +14,15 @@ from datetime import datetime, timedelta
 import io
 import traceback
 
+__version__ = '2.2'
+
 if __name__ == '__main__':
 
 	print("""
   ___  ___ _____ 
  |   \|   \_   _|
  | |) | |) || |  
- |___/|___/ |_|  client v2.1 (by th3r3g3nt)
+ |___/|___/ |_|  client v""" + __version__ + """ (by th3r3g3nt)
  dictionaryionary-based Data Transfer (via DNS)
  Data exfil for Red Teams
  
@@ -34,7 +36,7 @@ if __name__ == '__main__':
 		metavar="<data>",
 		help = "The file to exfiltrate Default: data.txt)")
 
-	p.add_argument("--dictionary", default="dictionary.txt",
+	p.add_argument("--dictionary", default="dict.txt",
 		metavar="<word-dictionary>",
 		help="The custom-word dictionaryionary lookup for the DNS names. Default: dictionary.txt; MUST match on client & server.")
 
@@ -63,7 +65,6 @@ if __name__ == '__main__':
 
 	p.add_argument("--debug", action='store_true', default=False,
 		help="Enable verbose output on the screen")
-
 
 	p.add_argument("--ipv6",action='store_true',default=False,
 		help="Use IPv6 AAAA record lookups; Default is IPv4 A record lookup")
@@ -120,13 +121,15 @@ if __name__ == '__main__':
 					yes = {'yes','y', 'ye', ''}
 					no = {'no','n'}
 
-					choice = raw_input().lower()
+					choice = input().lower()
 					if choice in yes: pass
 					elif choice in no: continue
 					else: print("Please respond with 'yes' or 'no'")
 					
 				if key in dictionary:
 					logging.info("Duplicate subdomain. Skipping {subdomain}".format(subdomain=key))
+					# TODO This should be handleded better
+
 				else:
 					#dictionary[key] = str(val)
 					dictionary[int(key)] = val
